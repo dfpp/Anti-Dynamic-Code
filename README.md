@@ -4,7 +4,7 @@
 
 动态分析允许分析者在程序执行过程中检查其状态和行为，这种方法非常适合于揭示软件中的运行时问题和漏洞。然而，这也给恶意分析带来了机会，他们可以利用动态分析工具如调试器、代码注入工具和运行时监控软件来探测和利用程序的弱点。为了对抗这种分析，反动态分析技术应运而生，它通过各种手段阻止或误导动态分析过程，以保护软件的运行安全。
 
-在本项目中，我们展示了三种主流的反动态分析技术，并提供了详细的代码示例和说明。通过对这些经典技术的展示，我们希望能够帮助读者深入理解反动态分析技术。
+在本项目中，我们展示了五大类主流的反动态分析技术。除了文中论述的反调试、虚拟环境检测和Root检测技术外，本项目还涵盖了反Hook和反篡改两类技术。我们提供了这五大类反动态分析技术详尽的代码示例和说明。通过对这些经典技术的展示，我们旨在帮助读者深入理解反动态分析技术。
 
 ## 反调试技术
 
@@ -246,4 +246,124 @@ private boolean isSUExist() {
     return false; // 如果所有路径均未找到 su 文件，返回 false
 }
 
+```
+
+
+## 反Hook
+在反Hook技术中，最常用的方法就是直接判断Hook框架对应的包是否存在。在本项目中，我们给出XPosed框架的检测代码。
+```java
+// 定义 Xposed 框架的关键类，用于检测是否存在 Xposed 环境
+private static final String XPOSED_HELPERS = "de.robv.android.xposed.XposedHelpers";
+private static final String XPOSED_BRIDGE = "de.robv.android.xposed.XposedBridge";
+
+// 通过抛出异常检查堆栈信息，判断 Xposed 环境是否存在
+public boolean isEposedExistByThrow() {
+    try {
+        // 手动抛出异常，捕获异常堆栈信息
+        throw new Exception("gg");
+    } catch (Exception e) {
+        // 遍历异常堆栈中的每一项，检查是否包含 Xposed 框架的类名
+        for (StackTraceElement stackTraceElement : e.getStackTrace()) {
+            if (stackTraceElement.getClassName().contains(XPOSED_BRIDGE)) 
+                return true; // 如果堆栈中包含 Xposed 框架的类名，说明 Xposed 环境存在
+        }
+        return false; // 堆栈中未发现 Xposed 框架的类名，说明 Xposed 环境不存在
+    }
+}
+
+// 检查 Xposed 的关键类是否存在，判断是否有 Xposed 环境
+public boolean isXposedExists() {
+    try {
+        // 尝试加载 XposedHelpers 类，如果成功加载，说明存在 Xposed 环境
+        Object xpHelperObj = ClassLoader
+                .getSystemClassLoader()
+                .loadClass(XPOSED_HELPERS)
+                .newInstance();
+    } catch (InstantiationException e) {
+        e.printStackTrace();
+        return true; // 报异常，说明 XposedHelpers 类可能存在
+    } catch (IllegalAccessException e) {
+        e.printStackTrace();
+        return true; // 报异常，说明 XposedHelpers 类可能存在
+    } catch (ClassNotFoundException e) {
+        e.printStackTrace();
+        return false; // 未找到类，说明 XposedHelpers 不存在
+    }
+
+    try {
+        // 尝试加载 XposedBridge 类，如果成功加载，说明存在 Xposed 环境
+        Object xpBridgeObj = ClassLoader
+                .getSystemClassLoader()
+                .loadClass(XPOSED_BRIDGE)
+                .newInstance();
+    } catch (InstantiationException e) {
+        e.printStackTrace();
+        return true; // 报异常，说明 XposedBridge 类可能存在
+    } catch (IllegalAccessException e) {
+        e.printStackTrace();
+        return true; // 报异常，说明 XposedBridge 类可能存在
+    } catch (ClassNotFoundException e) {
+        e.printStackTrace();
+        return false; // 未找到类，说明 XposedBridge 不存在
+    }
+    return true; // 如果两个类都加载成功，说明 Xposed 环境存在
+}
+
+// 尝试关闭 Xposed 的全局开关
+public boolean tryShutdownXposed() {
+    // 首先通过异常堆栈检查是否存在 Xposed 环境
+    if (isEposedExistByThrow()) {
+        Field xpdisabledHooks = null;
+        try {
+            // 尝试通过反射加载 XposedBridge 类，并获取 disableHooks 字段
+            xpdisabledHooks = ClassLoader.getSystemClassLoader()
+                    .loadClass(XPOSED_BRIDGE)
+                    .getDeclaredField("disableHooks");
+            xpdisabledHooks.setAccessible(true); // 设置字段为可访问
+            xpdisabledHooks.set(null, Boolean.TRUE); // 将 disableHooks 设置为 true，关闭全局钩子
+            return true; // 成功关闭 Xposed 钩子
+        } catch (NoSuchFieldException e) {
+            e.printStackTrace();
+            return false; // 未找到 disableHooks 字段，关闭失败
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+            return false; // 未找到 XposedBridge 类，关闭失败
+        } catch (IllegalAccessException e) {
+            e.printStackTrace();
+            return false; // 无法访问字段，关闭失败
+        }
+    } else {
+        return true; // 如果未检测到 Xposed 环境，直接返回 true
+    }
+}
+
+```
+## 反篡改
+安卓反篡改技术是一种用于保护应用程序完整性的方法，通过检测和防止未经授权的修改来确保程序运行的安全性和可靠性。其中，利用V2及以上签名认证或者检测应用是否是从可信的来源（如 Google Play 商店）安装的是比较常用且简单的手段。
+
+```java
+import android.content.Context;
+
+public class AntiTamper {
+
+    /**
+     * 检测应用是否被篡改
+     *
+     * @param context 应用上下文
+     */
+    public static void checkIntegrity(Context context) {
+        // 检查签名是否有效
+        if (!SignatureVerifier.isSignatureValid(context)) {
+            throw new SecurityException("Application signature mismatch! Possible tampering detected.");
+        }
+
+        // 检查安装来源是否可信
+        if (!InstallerVerifier.isInstallerTrusted(context)) {
+            throw new SecurityException("Application was installed from an untrusted source!");
+        }
+
+        // 如果两项检查均通过，应用未被篡改
+        System.out.println("Application integrity check passed.");
+    }
+}
 ```
