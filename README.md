@@ -117,7 +117,7 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved) {
 }
 ```
 
-## 虚拟环境检测
+## 虚拟环境检测技术
 对于虚拟环检测技术，在实际应用时，往往是多种不同的方法共同使用，以保证检测结果的可靠性，具体的代码可以参考如下：
 ```java
 @Deprecated
@@ -249,7 +249,7 @@ private boolean isSUExist() {
 ```
 
 
-## 反Hook
+## 反Hook技术
 在反Hook技术中，最常用的方法就是直接判断Hook框架对应的包是否存在。在本项目中，我们给出XPosed框架的检测代码。
 ```java
 // 定义 Xposed 框架的关键类，用于检测是否存在 Xposed 环境
@@ -338,7 +338,7 @@ public boolean tryShutdownXposed() {
 }
 
 ```
-## 反篡改
+## 反篡改技术
 安卓反篡改技术是一种用于保护应用程序完整性的方法，通过检测和防止未经授权的修改来确保程序运行的安全性和可靠性。其中，利用V2及以上签名认证或者检测应用是否是从可信的来源（如 Google Play 商店）安装的是比较常用且简单的手段。
 
 ```java
