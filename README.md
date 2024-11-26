@@ -176,9 +176,6 @@ public boolean readSysProperty(Context context, EmulatorCheckCallback callback) 
         sensorNum = sensorNum + sensorSize;
     }
 
-
-
-   
     if (emulatorCheckCallback != null) {
         StringBuffer stringBuffer = new StringBuffer("ceshi start|")
                 .append(baseBandVersion).append("|") // 基带信息
