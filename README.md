@@ -369,8 +369,19 @@ public boolean tryShutdownXposed() {
 利用 V2 及以上签名认证或者检测应用是否从可信来源（如 Google Play 商店）安装，是常用且简单的手段。在本项目中，我们展示了这两种反篡改方法的代码实现细节。
 ```java
 import android.content.Context;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
+import android.content.pm.Signature;
+import android.util.Base64;
+
+import java.security.MessageDigest;
 
 public class AntiTamper {
+    // 开发者预期的签名哈希值（需替换为实际签名的 SHA256 哈希值）
+    private static final String EXPECTED_SIGNATURE = "YOUR_EXPECTED_SHA256_HASH";
+
+    // 可信的安装来源包名（如 Google Play 商店）
+    private static final String TRUSTED_INSTALLER = "com.android.vending";
 
     /**
      * 检测应用是否被篡改
@@ -379,17 +390,85 @@ public class AntiTamper {
      */
     public static void checkIntegrity(Context context) {
         // 检查签名是否有效
-        if (!SignatureVerifier.isSignatureValid(context)) {
+        if (!isSignatureValid(context)) {
             throw new SecurityException("Application signature mismatch! Possible tampering detected.");
         }
 
         // 检查安装来源是否可信
-        if (!InstallerVerifier.isInstallerTrusted(context)) {
+        if (!isInstallerTrusted(context)) {
             throw new SecurityException("Application was installed from an untrusted source!");
         }
 
         // 如果两项检查均通过，应用未被篡改
         System.out.println("Application integrity check passed.");
+    }
+
+    /**
+     * 检查 APK 签名是否与预期一致
+     *
+     * @param context 应用上下文
+     * @return true 如果签名一致；false 如果签名被篡改
+     */
+    private static boolean isSignatureValid(Context context) {
+        try {
+            // 获取应用的 PackageInfo，包括签名信息
+            PackageInfo packageInfo = context.getPackageManager().getPackageInfo(
+                    context.getPackageName(),
+                    PackageManager.GET_SIGNING_CERTIFICATES
+            );
+
+            // V2 或更高签名的签名证书（获取 SHA256 的哈希值）
+            Signature[] signatures = packageInfo.signingInfo.getApkContentsSigners();
+            for (Signature signature : signatures) {
+                // 使用 SHA256 计算签名哈希
+                String signatureHash = getSHA256(signature.toByteArray());
+
+                // 比较签名哈希值是否与预期值一致
+                if (EXPECTED_SIGNATURE.equals(signatureHash)) {
+                    return true; // 签名一致
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return false; // 签名不一致
+    }
+
+    /**
+     * 检查应用的安装来源是否可信
+     *
+     * @param context 应用上下文
+     * @return true 如果安装来源可信；false 如果来源不可信
+     */
+    private static boolean isInstallerTrusted(Context context) {
+        try {
+            // 获取应用的安装来源
+            PackageManager pm = context.getPackageManager();
+            String installerPackageName = pm.getInstallerPackageName(context.getPackageName());
+
+            // 检查安装来源是否为可信来源
+            return TRUSTED_INSTALLER.equals(installerPackageName);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return false; // 安装来源不可信
+    }
+
+    /**
+     * 计算给定字节数据的 SHA256 哈希值
+     *
+     * @param data 要计算哈希值的字节数据
+     * @return 哈希值的十六进制字符串
+     */
+    private static String getSHA256(byte[] data) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(data);
+            return Base64.encodeToString(hash, Base64.NO_WRAP); // 返回 Base64 编码的哈希值
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
     }
 }
 ```
